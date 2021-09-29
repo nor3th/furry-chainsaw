@@ -1,301 +1,99 @@
-{
-    "attack-pattern": {
-        "malware": [
-            "delivers",
-            "uses"
-        ],
-        "identity": [
-            "targets"
-        ],
-        "location": [
-            "targets"
-        ],
-        "vulnerability": [
-            "targets"
-        ],
-        "tool": [
-            "uses"
-        ]
-    },
-    "campaign": {
-        "intrusion-set": [
-            "attributed-to"
-        ],
-        "threat-actor": [
-            "attributed-to"
-        ],
-        "infrastructure": [
-            "compromises",
-            "uses"
-        ],
-        "location": [
-            "originates-from",
-            "targets"
-        ],
-        "identity": [
-            "targets"
-        ],
-        "vulnerability": [
-            "targets"
-        ],
-        "attack-pattern": [
-            "uses"
-        ],
-        "malware": [
-            "uses"
-        ],
-        "tool": [
-            "uses"
-        ]
-    },
-    "course-of-action": {
-        "indicator": [
-            "investigates",
-            "mitigates"
-        ],
-        "attack-pattern": [
-            "mitigates"
-        ],
-        "malware": [
-            "mitigates",
-            "remediates"
-        ],
-        "tool": [
-            "mitigates"
-        ],
-        "vulnerability": [
-            "mitigates",
-            "remediates"
-        ]
-    },
-    "identity": {
-        "location": [
-            "located-at"
-        ]
-    },
-    "indicator": {
-        "attack-pattern": [
-            "indicates"
-        ],
-        "campaign": [
-            "indicates"
-        ],
-        "infrastructure": [
-            "indicates"
-        ],
-        "intrusion-set": [
-            "indicates"
-        ],
-        "malware": [
-            "indicates"
-        ],
-        "threat-actor": [
-            "indicates"
-        ],
-        "tool": [
-            "indicates"
-        ],
-        "observed-data": [
-            "based-on"
-        ]
-    },
-    "infrastructure": {
-        "infrastructure": [
-            "communicates-with",
-            "consists-of",
-            "controls",
-            "uses"
-        ],
-        "ipv4-addr": [
-            "communicates-with"
-        ],
-        "ipv6-addr": [
-            "communicates-with"
-        ],
-        "domain-name": [
-            "communicates-with"
-        ],
-        "url": [
-            "communicates-with"
-        ],
-        "observed-data": [
-            "consists-of"
-        ],
-        "malware": [
-            "controls",
-            "delivers",
-            "hosts"
-        ],
-        "vulnerability": [
-            "has"
-        ],
-        "tool": [
-            "hosts"
-        ],
-        "location": [
-            "located-at"
-        ]
-    },
-    "intrusion-set": {
-        "threat-actor": [
-            "attributed-to"
-        ],
-        "infrastructure": [
-            "compromises",
-            "hosts",
-            "owns",
-            "uses"
-        ],
-        "location": [
-            "originates-from",
-            "targets"
-        ],
-        "identity": [
-            "targets"
-        ],
-        "vulnerability": [
-            "targets"
-        ],
-        "attack-pattern": [
-            "uses"
-        ],
-        "malware": [
-            "uses"
-        ],
-        "tool": [
-            "uses"
-        ]
-    },
-    "malware": {
-        "threat-actor": [
-            "authored-by"
-        ],
-        "intrusion-set": [
-            "authored-by"
-        ],
-        "infrastructure": [
-            "beacons-to",
-            "exfiltrates-to",
-            "targets",
-            "uses"
-        ],
-        "ipv4-addr": [
-            "communicates-with"
-        ],
-        "ipv6-addr": [
-            "communicates-with"
-        ],
-        "domain-name": [
-            "communicates-with"
-        ],
-        "url": [
-            "communicates-with"
-        ],
-        "malware": [
-            "controls",
-            "downloads",
-            "drops",
-            "uses",
-            "variant-of"
-        ],
-        "tool": [
-            "downloads",
-            "drops",
-            "uses"
-        ],
-        "file": [
-            "downloads",
-            "drops"
-        ],
-        "vulnerability": [
-            "exploits",
-            "targets"
-        ],
-        "location": [
-            "originates-from",
-            "targets"
-        ],
-        "identity": [
-            "targets"
-        ],
-        "attack-pattern": [
-            "uses"
-        ]
-    },
-    "threat-actor": {
-        "identity": [
-            "attributed-to",
-            "impersonates",
-            "targets"
-        ],
-        "infrastructure": [
-            "compromises",
-            "hosts",
-            "owns",
-            "uses"
-        ],
-        "location": [
-            "located-at",
-            "targets"
-        ],
-        "vulnerability": [
-            "targets"
-        ],
-        "attack-pattern": [
-            "uses"
-        ],
-        "malware": [
-            "uses"
-        ],
-        "tool": [
-            "uses"
-        ]
-    },
-    "tool": {
-        "malware": [
-            "delivers",
-            "drops"
-        ],
-        "vulnerability": [
-            "has",
-            "targets"
-        ],
-        "identity": [
-            "targets"
-        ],
-        "infrastructure": [
-            "targets",
-            "uses"
-        ],
-        "location": [
-            "targets"
-        ]
-    },
-    "domain-name": {
-        "domain-name": [
-            "resolves-to"
-        ],
-        "ipv4-addr": [
-            "resolves-to"
-        ],
-        "ipv6-addr": [
-            "resolves-to"
-        ]
-    },
-    "ipv4-addr": {
-        "mac-addr": [
-            "resolves-to"
-        ],
-        "autonomous-system": [
-            "belongs-to"
-        ]
-    },
-    "ipv6-addr": {
-        "mac-addr": [
-            "resolves-to"
-        ],
-        "autonomous-system": [
-            "belongs-to"
-        ]
-    }
+import requests
+from bs4 import BeautifulSoup
+import json
+
+element_mapping = {
+    0: 'source',
+    1: 'relationship',
+    2: 'target'
 }
+
+# translate those STIX entities
+name_mapping = {
+    '<All STIX Cyber-observable Objects>': [],
+}
+
+# STIX documentation
+stix_url = "https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html"
+
+
+def parse_relationship(content: list, relationships: list) -> list:
+    if content[0] == '—' or content[0] == "Source":
+        return relationships
+
+    source = content[0]
+    relationship = content[1]
+    targets = content[2].split(',')
+    for relat in relationship.split(','):
+        for target in targets:
+            target = target.strip()
+            if target in name_mapping.keys():
+                targets += name_mapping[target]
+            else:
+                relationships.append({
+                    element_mapping[0]: source,
+                    element_mapping[1]: relat.strip(),
+                    element_mapping[2]: target
+                })
+
+    return relationships
+
+
+def parse_stix_docs(html_class: dict):
+    r = requests.get(stix_url, allow_redirects=True)
+    contents = r.content
+    soup = BeautifulSoup(contents, 'lxml')
+    items = soup.body.div
+    relationships = []
+    for t in items.find_all('table', html_class):
+        if html_class:
+            rel_beginning = True
+        else:
+            rel_beginning = False
+        for tr in t.find_all('tr'):
+            content = []
+            for td in tr.find_all('td'):
+                text = ""
+                for p_elem in td.find_all('p'):
+                    text += p_elem.text
+
+                if rel_beginning:
+                    content.append(text)
+
+                if "Relationship Type" in text:
+                    rel_beginning = True
+                    break
+
+                if "Reverse Relationships" in text:
+                    rel_beginning = False
+
+            if len(content) == 4 or html_class:
+                relationships = parse_relationship(content, relationships)
+
+    unique_list = list(
+        {(v[element_mapping[0]], v[element_mapping[1]], v[element_mapping[2]]): v for v in relationships}.values())
+
+    return unique_list
+
+
+def export_json(overall: list):
+    json_dict = {}
+    # sort by source
+    for item in overall:
+        source = item[element_mapping[0]]
+        relationship = item[element_mapping[1]]
+        target = item[element_mapping[2]]
+        if source in json_dict:
+            if target in json_dict[source]:
+                json_dict[source][target].append(relationship)
+            else:
+                json_dict[source][target] = [relationship]
+        else:
+            json_dict[source] = {target: [relationship]}
+
+    with open('data.json', 'w', encoding='utf-8') as f:
+        json.dump(json_dict, f, ensure_ascii=False, indent=4)
+
+
+overall_list = parse_stix_docs({})
+export_json(overall_list)
