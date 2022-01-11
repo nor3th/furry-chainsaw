@@ -1,10 +1,13 @@
 import json
 import os.path
+
 import requests
 from bs4 import BeautifulSoup
 
 ALL_SCOs = "<all_SCOs>"
 ALL_SDOs = "<all_SDOs>"
+
+export_file_name = "stix_relationships-{}.json"
 
 headline = ['h1', 'h2', 'h3', 'h4']
 
@@ -18,42 +21,51 @@ element_mapping = {
 
 local_filename = "./stix-v2.1-os.html"
 
+
 sco_list = [
-  # 'artifact',
-  'autonomous-system',
-  'directory',
-  'domain-name',
-  'email-addr',
-  'email-message',
-  'email-mime-part-type',
-  'stixfile', # file original name
-  # 'windows-pebinary-ext',
-  # 'windows-pe-optional-header-type',
-  # 'windows-pe-section-type',
-  'ipv4-addr',
-  'ipv6-addr',
-  'mac-addr',
-  'mutex',
-  'network-traffic',
-  # 'http-request-ext',
-  # 'imcp-ext',
-  # 'socket-ext',
-  # 'tcp-ext',
-  'process',
-  # 'windows-process-ext',
-   # 'windows-service-ext',
-  'url',
-  'user-account',
-  # 'unix-account-ext',
-  'windows-registry-key',
-  'windows-registry-value-type',
-  'x509-certificate',
-  'x509-v3-extensions-type',
+    'artifact',
+    'autonomous-system',
+    'directory',
+    'domain-name',
+    'email-addr',
+    'email-message',
+    'email-mime-part-type',
+    'file',
+    'windows-pebinary-ext',
+    'windows-pe-optional-header-type',
+    'windows-pe-section-type',
+    'ipv4-addr',
+    'ipv6-addr',
+    'mac-addr',
+    'mutex',
+    'network-traffic',
+    'http-request-ext',
+    'icmp-ext',
+    'socket-ext',
+    'tcp-ext',
+    'process',
+    'windows-process-ext',
+    'windows-service-ext',
+    'url',
+    'user-account',
+    'unix-account-ext',
+    'windows-registry-key',
+    'windows-registry-value-type',
+    'x509-certificate',
+    'x509-v3-extensions-type',
+    'x-opencti-cryptographic-key',
+    'x-opencti-cryptocurrency-wallet',
+    'x-opencti-hostname',
+    'x-opencti-text',
+    'x-opencti-user-agent',
 ]
 
 # translate those STIX entities
 name_mapping = {
     '<All STIX Cyber-observable Objects>': [ALL_SCOs],
+}
+
+final_mapping = {
     ALL_SCOs: sco_list
 }
 
@@ -63,26 +75,44 @@ hard_coded_mapping = {
     'file': {
         'contains': [ALL_SCOs]
     },
-    # 'sighting': {
-    #     'where_sighted': ['location', 'identity'],
-    #     'observed_data': ['observed_data'],
-    #     'sighting_of': [ALL_SDOs]
-    # },
-    # 'relationship': {
-    #     'target': [ALL_SCOs, ALL_SDOs],
-    #     'source': [ALL_SCOs, ALL_SDOs],
-    # },
     'malware-analysis': {
         'sample': ['file', 'network-traffic', 'artifact'],
         'analysis-sco': [ALL_SCOs]
     },
     'malware': {
         'sample': ['file', 'artifact']
+    },
+    'windows-registry-key': {
+        'values': ['windows-registry-value-type']
+    },
+    'email-message': {
+        'body-multipart': ['email-mime-part-type']
+    },
+    'windows-pebinary-ext': {
+        'sections': ['windows-pe-section-type']
+    },
+    'ntfs-ext': {
+        'alternate-data-streams': ['alternate-data-stream-type']
+    },
+    'archive-ext': {
+        'contains': ['file', 'directory']
     }
 }
 
+
 # STIX documentation
 stix_url = "https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html"
+
+
+def is_identitier(content: list, so_list: list) -> bool:
+    if "identifier" in content[1]:
+        return True
+
+    for so in so_list:
+        if f"list of type {so}" in content[1]:
+            return True
+
+    return False
 
 
 def parse_ref_properties(content: list, relationships: list, so_name: str, so_list: list[str]) -> list:
@@ -92,9 +122,11 @@ def parse_ref_properties(content: list, relationships: list, so_name: str, so_li
 
     # resolves-to and belongs-to is also a relationship
     if "object_ref" in content[0] or \
-            "resolves_to" in content[0] or \
-            "belongs_to" in content[0] or \
-            "identifier" not in content[1]:
+        "resolves_to" in content[0] or \
+        "external_references" in content[0]:
+        return relationships
+
+    if not is_identitier(content, so_list):
         return relationships
 
     found_sos = []
@@ -104,6 +136,7 @@ def parse_ref_properties(content: list, relationships: list, so_name: str, so_li
                 found_sos.append(so)
 
     relationship_name = content[0].split('_ref')[0].replace('_', '-')
+    relationship_name = relationship_name.split(' ')[0]
 
     if len(found_sos) == 0:
         if so_name in hard_coded_mapping and relationship_name in hard_coded_mapping[so_name]:
@@ -164,7 +197,7 @@ def get_so(items) -> list:
                 continue
 
             so_list.append(so_name)
-            print(f"SDO found: {so_name}")
+            print(f"SO found: {so_name}")
 
     return so_list
 
@@ -228,7 +261,8 @@ def parse_stix_docs(html_class: dict):
                     table_type = "property"
                     break
 
-                if "Property Name" in text and table_type == "property":
+                if "Property Name" in text: # and table_type == "property":
+                    table_type = "property"
                     info_beginning = True
                     break
 
@@ -247,7 +281,7 @@ def parse_stix_docs(html_class: dict):
                 relationships = parse_ref_properties(content, relationships, so_name, so_list)
 
         if table_type != "":
-            print(f"SDO: {so_name} Table type: {table_type}")
+            print(f"SO: {so_name} Table type: {table_type}")
 
     unique_list = list(
         {(v[element_mapping[0]], v[element_mapping[1]], v[element_mapping[2]]): v for v in relationships}.values())
@@ -255,25 +289,33 @@ def parse_stix_docs(html_class: dict):
     return unique_list
 
 
-def export_json(overall: list):
+def export_json(overall: list, resolve_mapping: bool = False, suffix: str = "backend"):
     json_dict = {}
     # sort by source
     # pprint(overall)
     for item in overall:
         source = item[element_mapping[0]]
         relationship = item[element_mapping[1]]
-        target = item[element_mapping[2]]
-        if source in json_dict:
-            if target in json_dict[source]:
-                json_dict[source][target].append(relationship)
-            else:
-                json_dict[source][target] = [relationship]
-        else:
-            json_dict[source] = {target: [relationship]}
+        single_target = item[element_mapping[2]]
 
-    with open('data.json', 'w', encoding='utf-8') as f:
+        if resolve_mapping and single_target in final_mapping:
+            targets = final_mapping[single_target]
+        else:
+            targets = [single_target]
+
+        for target in targets:
+            if source in json_dict:
+                if target in json_dict[source]:
+                    json_dict[source][target].append(relationship)
+                else:
+                    json_dict[source][target] = [relationship]
+            else:
+                json_dict[source] = {target: [relationship]}
+
+    with open(export_file_name.format(suffix), 'w', encoding='utf-8') as f:
         json.dump(json_dict, f, ensure_ascii=False, indent=4)
 
 
 overall_list = parse_stix_docs({})
 export_json(overall_list)
+export_json(overall_list, True, "frontend")
