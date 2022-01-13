@@ -323,4 +323,4 @@ def read_opencti_custom_additions() -> dict:
 overall_list = parse_stix_docs()
 opencti_additions = read_opencti_custom_additions()
 export_json(overall_list, opencti_additions)
-export_json(overall_list, None, True, "frontend")
+export_json(overall_list, opencti_additions, True, "frontend")
