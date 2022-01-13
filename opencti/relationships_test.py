@@ -1,16 +1,16 @@
+import copy
 import json
 import os.path
-
 import requests
 from bs4 import BeautifulSoup
 
 ALL_SCOs = "<all_SCOs>"
-ALL_SDOs = "<all_SDOs>"
 
 export_file_name = "stix_relationships-{}.json"
+opencti_custom_file = "opencti_custom.json"
+local_stix_docs_file = "./stix-v2.1-os.html"
 
 headline = ['h1', 'h2', 'h3', 'h4']
-
 simple_SOs = ['binary', 'dictionary', 'enum', 'hex']
 
 element_mapping = {
@@ -18,9 +18,6 @@ element_mapping = {
     1: 'relationship',
     2: 'target'
 }
-
-local_filename = "./stix-v2.1-os.html"
-
 
 sco_list = [
     'artifact',
@@ -99,12 +96,11 @@ hard_coded_mapping = {
     }
 }
 
-
 # STIX documentation
 stix_url = "https://docs.oasis-open.org/cti/stix/v2.1/os/stix-v2.1-os.html"
 
 
-def is_identitier(content: list, so_list: list) -> bool:
+def is_identifier(content: list, so_list: list) -> bool:
     if "identifier" in content[1]:
         return True
 
@@ -116,17 +112,16 @@ def is_identitier(content: list, so_list: list) -> bool:
 
 
 def parse_ref_properties(content: list, relationships: list, so_name: str, so_list: list[str]) -> list:
-    # print(content)
     if len(content) == 0 or so_name in name_mapping.keys():
         return relationships
 
     # resolves-to and belongs-to is also a relationship
     if "object_ref" in content[0] or \
-        "resolves_to" in content[0] or \
-        "external_references" in content[0]:
+            "resolves_to" in content[0] or \
+            "external_references" in content[0]:
         return relationships
 
-    if not is_identitier(content, so_list):
+    if not is_identifier(content, so_list):
         return relationships
 
     found_sos = []
@@ -145,7 +140,6 @@ def parse_ref_properties(content: list, relationships: list, so_name: str, so_li
             print(f"Using hardcoded approach for {so_name} -> {relationship_name}: {found_sos}")
         else:
             print(f"Needs post processing ref? {so_name} -> {relationship_name} ({content})")
-    # print(f"Possible ref? {content} ({found_sos})")
 
     for so in found_sos:
         relationships.append({
@@ -202,14 +196,14 @@ def get_so(items) -> list:
     return so_list
 
 
-def parse_stix_docs(html_class: dict):
-    if os.path.isfile(local_filename):
-        with open(local_filename, 'r', encoding="ISO-8859-1") as f:
+def parse_stix_docs():
+    if os.path.isfile(local_stix_docs_file):
+        with open(local_stix_docs_file, 'r', encoding="ISO-8859-1") as f:
             contents = f.read()
     else:
         r = requests.get(stix_url, allow_redirects=True)
         contents = r.content
-        with open(local_filename, "wb") as file:
+        with open(local_stix_docs_file, "wb") as file:
             file.write(contents)
 
     soup = BeautifulSoup(contents, 'lxml')
@@ -218,7 +212,7 @@ def parse_stix_docs(html_class: dict):
 
     so_list = get_so(items)
 
-    for t in items.find_all('table', html_class):
+    for t in items.find_all('table'):
         parent_headline = set()
         so_name = ""
         for prev_tag in t.find_all_previous(['p'] + headline):
@@ -230,7 +224,6 @@ def parse_stix_docs(html_class: dict):
                 break
 
             if len(parent_headline) >= 2:
-                # print("Not what I'm looking for")
                 break
 
         # Not the table I'm looking for
@@ -239,10 +232,7 @@ def parse_stix_docs(html_class: dict):
 
         # Relationship or property table
         table_type = ""
-        if html_class:
-            info_beginning = True
-        else:
-            info_beginning = False
+        info_beginning = False
 
         for tr in t.find_all('tr'):
             content = []
@@ -261,7 +251,7 @@ def parse_stix_docs(html_class: dict):
                     table_type = "property"
                     break
 
-                if "Property Name" in text: # and table_type == "property":
+                if "Property Name" in text:  # and table_type == "property":
                     table_type = "property"
                     info_beginning = True
                     break
@@ -275,7 +265,7 @@ def parse_stix_docs(html_class: dict):
                 if "Reverse Relationships" in text:
                     info_beginning = False
 
-            if table_type == "relationship" and (len(content) == 4 or html_class):
+            if table_type == "relationship" and (len(content) == 4):
                 relationships = parse_relationship(content, relationships)
             elif table_type == "property":
                 relationships = parse_ref_properties(content, relationships, so_name, so_list)
@@ -289,10 +279,16 @@ def parse_stix_docs(html_class: dict):
     return unique_list
 
 
-def export_json(overall: list, resolve_mapping: bool = False, suffix: str = "backend"):
-    json_dict = {}
-    # sort by source
-    # pprint(overall)
+# overall = list of relationships
+# opencti_additions = Custom OpenCTI STIX relationship additions
+# resolve_mapping = Translate ALL_SCO entries to all SCO values
+# suffix = suffix for result file
+def export_json(overall: list, opencti_additions: dict = None, resolve_mapping: bool = False, suffix: str = "backend"):
+    if opencti_additions is None:
+        json_dict = {}
+    else:
+        json_dict = copy.deepcopy(opencti_additions)
+
     for item in overall:
         source = item[element_mapping[0]]
         relationship = item[element_mapping[1]]
@@ -316,6 +312,15 @@ def export_json(overall: list, resolve_mapping: bool = False, suffix: str = "bac
         json.dump(json_dict, f, ensure_ascii=False, indent=4)
 
 
-overall_list = parse_stix_docs({})
-export_json(overall_list)
-export_json(overall_list, True, "frontend")
+def read_opencti_custom_additions() -> dict:
+    if os.path.isfile(opencti_custom_file):
+        with open(opencti_custom_file, 'r') as f:
+            return json.loads(f.read())
+
+    return {}
+
+
+overall_list = parse_stix_docs()
+opencti_additions = read_opencti_custom_additions()
+export_json(overall_list, opencti_additions)
+export_json(overall_list, None, True, "frontend")
