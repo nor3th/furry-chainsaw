@@ -1,6 +1,8 @@
 import copy
 import json
 import os.path
+from pprint import pprint
+
 import requests
 from bs4 import BeautifulSoup
 
@@ -11,7 +13,7 @@ opencti_custom_file = "opencti_custom.json"
 local_stix_docs_file = "./stix-v2.1-os.html"
 
 headline = ['h1', 'h2', 'h3', 'h4']
-simple_SOs = ['binary', 'dictionary', 'enum', 'hex']
+simple_SOs = ['binary', 'dictionary', 'enum', 'hex', 'hashes']
 
 element_mapping = {
     0: 'source',
@@ -86,13 +88,17 @@ hard_coded_mapping = {
         'body-multipart': ['email-mime-part-type']
     },
     'windows-pebinary-ext': {
-        'sections': ['windows-pe-section-type']
+        'sections': ['windows-pe-section-type'],
+        'optional-header': ['windows-pe-optional-header-type']
     },
     'ntfs-ext': {
         'alternate-data-streams': ['alternate-data-stream-type']
     },
     'archive-ext': {
         'contains': ['file', 'directory']
+    },
+    'x509-certificate': {
+        'x509-v3-extensions': ['x509-v3-extensions-type']
     }
 }
 
@@ -105,7 +111,7 @@ def is_identifier(content: list, so_list: list) -> bool:
         return True
 
     for so in so_list:
-        if f"list of type {so}" in content[1]:
+        if so in content[1]:
             return True
 
     return False
@@ -283,13 +289,20 @@ def parse_stix_docs():
 # opencti_additions = Custom OpenCTI STIX relationship additions
 # resolve_mapping = Translate ALL_SCO entries to all SCO values
 # suffix = suffix for result file
-def export_json(overall: list, opencti_additions: dict = None, resolve_mapping: bool = False, suffix: str = "backend"):
-    if opencti_additions is None:
-        json_dict = {}
-    else:
-        json_dict = copy.deepcopy(opencti_additions)
+def export_json(overall: list, opencti_additions: dict[str, dict[str, list]] = None, resolve_mapping: bool = False, suffix: str = "backend"):
+    relation_list = copy.deepcopy(overall)
+    if opencti_additions:
+        for source, relationship in opencti_additions.items():
+            for target, relations in relationship.items():
+                for relation in relations:
+                    relation_list.append({
+                        element_mapping[0]: source,
+                        element_mapping[1]: relation,
+                        element_mapping[2]: target
+                    })
+    json_dict = {}
 
-    for item in overall:
+    for item in relation_list:
         source = item[element_mapping[0]]
         relationship = item[element_mapping[1]]
         single_target = item[element_mapping[2]]
